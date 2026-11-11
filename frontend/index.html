@@ -3,130 +3,102 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>골목버림 - 홈</title>
+  <title>골목버림 - 쓰레기는 골목버림으로</title>
+  <link rel="icon" href="img/logo.png">
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body data-tab="home">
-  <main>
-    <section class="hero">
-      <img src="img/hero.jpg" alt="빌라 건물 사진">
-      <div class="hero-text">
-        <h1>집 앞 대신 모음터로</h1>
-        <p id="heroSub">우리 골목이 함께 깨끗해져요</p>
+<body data-tab="home" data-closing="1">
+
+  <section class="hero">
+    <div class="hero-top">
+      <a class="logo" href="index.html"><img src="img/logo.png" alt=""><span>골목버림</span></a>
+      <div class="btns">
+        <a class="outline-btn" href="join.html#town">우리 골목 신청하기</a>
       </div>
-    </section>
+    </div>
+    <div class="hero-copy">
+      <h1>쓰레기는 골목버림으로</h1>
+      <p>분리배출 안내부터 모음터 적재량, 골목 지킴이 당번까지</p>
+      <a class="duty-pill" id="dutyPill" href="join.html#guardian" hidden></a>
+    </div>
+  </section>
 
-    <section class="feature-area">
-      <h2>무엇을 도와드릴까요</h2>
-      <div class="feature-row" id="featureRow">
-        <a class="feature-card" href="scan.html">
-          <img src="img/idea.png" alt="">
-          <h3>사진 분리배출</h3>
-          <p>헷갈리는 쓰레기를 찍으면 버리는 법을 알려줘요</p>
-        </a>
-        <a class="feature-card" href="join.html">
-          <img src="img/villa.svg" alt="">
-          <h3>골목 단지</h3>
-          <p>이웃 빌라와 모여 60세대 단지를 만들어요</p>
-        </a>
-        <a class="feature-card" href="join.html#guardian" id="guardianCard">
-          <img src="img/person.png" alt="">
-          <h3>골목 지킴이</h3>
-          <p id="guardianCardText">모음터 정리 당번을 확인해요</p>
-        </a>
-        <a class="feature-card" href="join.html#retention">
-          <img src="img/laurel.png" alt="">
-          <h3>포인트와 보상</h3>
-          <p id="pointCardText">지킴이 인증과 연속 참여로 포인트를 모아요</p>
-        </a>
-        <a class="feature-card" href="join.html#retention">
-          <img src="img/flower.png" alt="">
-          <h3>깨끗한 골목</h3>
-          <p>집 앞 배출이 얼마나 줄었는지 함께 봐요</p>
-        </a>
+  <nav class="menu-card" aria-label="바로가기">
+    <a href="scan.html"><img src="img/idea.png" alt=""><span>사진 분리배출</span></a>
+    <a href="dashboard.html"><img src="img/bin.svg" alt=""><span>모음터 적재량</span></a>
+    <a href="join.html#map" class="active"><img src="img/villa.svg" alt=""><span>골목단지</span></a>
+    <a href="join.html#guardian" id="menuGuardian"><img src="img/person.png" alt=""><span>골목 지킴이</span></a>
+    <a href="join.html#retention"><img src="img/laurel.png" alt=""><span>포인트·보상</span></a>
+    <a href="join.html#map" id="menuSearch"><img src="img/search.svg" alt=""><span>다른 동네 찾기</span></a>
+  </nav>
+
+  <section class="section">
+    <div class="sec-head">
+      <div class="eyebrow-en">Today in our alley</div>
+      <h2>오늘 저녁 챙겨야 할 <b>우리 골목 소식</b></h2>
+      <p class="lead">버리는 날, 모음터 상태, 내 당번을 한 번에 알려드려요</p>
+    </div>
+    <div class="news-row" id="newsRow"></div>
+  </section>
+
+  <section class="section">
+    <div class="feature-split">
+      <div>
+        <div class="eyebrow-en">What's New?</div>
+        <h2 style="margin:0;font-size:clamp(24px,3.4vw,34px);font-weight:400;letter-spacing:-0.03em;line-height:1.35">
+          헷갈리는 분리배출은 바로바로<br><b style="font-weight:800">사진 한 장으로</b>
+        </h2>
+        <p style="margin:12px 0 0;font-size:18px">찍기만 하면 AI가 버리는 순서까지 알려드려요</p>
+        <p class="muted" style="margin-top:8px">배달 용기, 택배 상자, 깨진 그릇까지</p>
+        <a class="btn navy" href="scan.html" style="margin-top:18px">사진으로 물어보기</a>
       </div>
-      <div class="dots" id="dots" aria-hidden="true"></div>
-    </section>
+      <div style="text-align:center"><img src="img/idea.png" alt=""></div>
+    </div>
+  </section>
 
-    <section class="card">
-      <h2>오늘 버릴 수 있어요</h2>
-      <p class="sub" id="today"></p>
-      <div id="schedule">불러오는 중...</div>
-      <div class="panel" id="noticeBox" hidden><p id="notice"></p></div>
-    </section>
-
-    <section class="card">
-      <h2>가까운 모음터</h2>
-      <p class="sub">집 앞 대신 모음터에 버려 주세요</p>
-      <div id="stations">불러오는 중...</div>
-      <div class="btn-row"><a class="btn" href="dashboard.html" style="text-decoration:none">지도에서 보기</a></div>
-    </section>
-
-    <section class="card">
-      <h2>내 포인트</h2>
-      <div class="big-num" id="points"></div>
-      <p class="muted">지킴이 인증, 연속 참여로 모을 수 있어요</p>
-    </section>
-  </main>
+  <div class="float-btns">
+    <button class="navy" id="floatAlert">저녁 7시<br>알림 보기</button>
+    <button class="blue" onclick="location.href='join.html#map'">다른 동네<br>찾기</button>
+  </div>
 
   <script src="js/api.js"></script>
   <script src="js/features.js"></script>
   <script src="js/layout.js"></script>
   <script>
     async function load() {
-      const d = new Date();
-      document.getElementById("today").textContent =
-        `${d.getMonth() + 1}월 ${d.getDate()}일 ${"일월화수목금토"[d.getDay()]}요일`;
+      const f = getFeatures();
+      const d = getMyDutyInfo();
+
+      if (f.guardian) {
+        const pill = document.getElementById("dutyPill");
+        pill.innerHTML = `내 지킴이 당번까지 <b>${d.left}번</b> 남았어요`;
+        pill.hidden = false;
+      } else {
+        document.getElementById("menuGuardian").remove();
+      }
 
       const schedule = await getTodaySchedule();
-      document.getElementById("schedule").innerHTML = schedule.items.map(item => `
-        <div class="row">
-          <span>${item.type}</span>
-          ${item.ok
-            ? `<span class="badge info">가능 · ${item.time}</span>`
-            : `<span class="badge no">${item.time}</span>`}
-        </div>`).join("");
-      if (schedule.notice) {
-        document.getElementById("notice").textContent = schedule.notice;
-        document.getElementById("noticeBox").hidden = false;
-      }
-
       const stations = await getStations();
-      document.getElementById("stations").innerHTML = stations.map(s => {
-        const food = s.bins.find(b => b.type === "음식물");
-        return `
-          <div class="row">
-            <span>${s.name}</span>
-            <span>음식물 ${food.fill}% ${fillBadge(food.fill)}</span>
-          </div>`;
-      }).join("");
+      const okTypes = schedule.items.filter(i => i.ok);
+      const fullest = stations.flatMap(s => s.bins.map(b => ({ ...b, station: s.name.split(" (")[0] })))
+        .sort((a, b) => b.fill - a.fill)[0];
 
-      document.getElementById("points").textContent = getPoints().toLocaleString() + "P";
-      setupFeatureCards();
-    }
+      const cards = [
+        { href: "index.html", title: okTypes.length ? `오늘 ${okTypes.map(i => i.type).join("·")} 버리는 날이에요` : "오늘은 배출일이 아니에요",
+          meta: okTypes.length ? `${okTypes[0].time} · 모음터로` : "집 안에 보관해 주세요" },
+        { href: "dashboard.html", title: `${fullest.station} ${fullest.type}통이 ${fullest.fill}% 찼어요`,
+          meta: `가득 예상 ${formatTime(fullest.full_at)}` },
+        f.guardian
+          ? { href: "join.html#guardian", title: `내 지킴이 당번까지 ${d.left}번 남았어요`, meta: d.week }
+          : { href: "join.html#retention", title: "3개월 연속 참여하면 보너스 포인트", meta: `지금 ${getPoints().toLocaleString()}P` }
+      ];
 
-    function setupFeatureCards() {
-      const f = getFeatures();
-      if (f.guardian) {
-        const d = getMyDutyInfo();
-        document.getElementById("guardianCardText").textContent = `내 당번까지 ${d.left}번 남았어요 (${d.week})`;
-      } else {
-        document.getElementById("guardianCard").remove();
-      }
-      document.getElementById("pointCardText").textContent =
-        `지금 ${getPoints().toLocaleString()}P · 3개월 연속 참여하면 보너스`;
+      document.getElementById("newsRow").innerHTML = cards.map(c => `
+        <a class="news" href="${c.href}"><h3>${c.title}</h3><span class="meta">${c.meta}</span></a>`).join("") + `
+        <a class="news more" href="join.html#map"><h3>더 많은<br><b>골목 소식</b><br>보러 가기</h3><span class="line"></span></a>`;
 
-      const row = document.getElementById("featureRow");
-      const cards = [...row.children];
-      const dots = document.getElementById("dots");
-      dots.innerHTML = cards.map(() => "<span></span>").join("");
-      const update = () => {
-        const w = cards[0].offsetWidth + 14;
-        const i = Math.min(cards.length - 1, Math.round(row.scrollLeft / w));
-        [...dots.children].forEach((d, k) => d.classList.toggle("on", k === i));
-      };
-      row.addEventListener("scroll", update, { passive: true });
-      update();
+      const fa = document.getElementById("floatAlert");
+      if (f.eveningAlert) fa.onclick = previewEveningAlert; else fa.remove();
     }
     load();
   </script>

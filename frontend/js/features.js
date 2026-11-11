@@ -143,3 +143,67 @@ const MY_PARTICIPATION = [
   { month: "11월", ok: null } // 진행 중
 ];
 const STREAK_REWARD = 1000;
+
+// ---------- 골목 지도: 지역별 모음터 ----------
+// 오래3길은 api.js의 실제(예시) 모음터를 쓰고,
+// 화양동은 '주택가·원룸 상권' 특징을 보고 정한 제안 위치입니다.
+const STATION_HOUSEHOLDS = { 1: 18, 2: 16, 3: 13 };
+
+const REGIONS = [
+  {
+    key: "orae",
+    name: "오래3길 골목 단지",
+    area: "경기 화성시 봉담읍 동화리",
+    keywords: ["오래", "봉담", "화성", "동화리", "동화"],
+    center: [37.2201, 126.9546],
+    zoom: 18,
+    operating: true
+  },
+  {
+    key: "hwayang",
+    name: "화양동 주택가",
+    area: "서울 광진구 화양동 (건대입구역 북쪽)",
+    keywords: ["화양", "건대", "건국", "광진", "아차산", "능동"],
+    center: [37.5422, 127.0682],
+    zoom: 17,
+    operating: false,
+    note: "빌라·다가구와 원룸, 음식점이 한 블록에 섞인 주택가 상권이에요. 빌라 30채 중 18곳에 분리배출 시설이 없었다는 현장 보도가 있었던 동네예요.",
+    sites: [
+      { id: "h1", name: "햇님어린이공원 옆", lat: 37.54276, lng: 127.06692, households: 72,
+        why: "주택가 한가운데 공공 부지라 설치 동의를 받기 쉽고, 골목 어디서든 3분 안에 걸어올 수 있어요" },
+      { id: "h2", name: "북쪽 원룸 골목 교차로", lat: 37.54351, lng: 127.06789, households: 64,
+        why: "1인 가구 원룸이 가장 촘촘한 구역이라 집 앞 배출 민원이 몰리는 곳이에요" },
+      { id: "h3", name: "동쪽 골목 빈터", lat: 37.54272, lng: 127.06913, households: 55,
+        why: "건물 사이 비어 있는 포장 공간을 활용해 보행로를 막지 않아요" },
+      { id: "h4", name: "먹자골목 입구 (상가 전용)", lat: 37.54133, lng: 127.06833, households: 38,
+        why: "역 앞 음식점이 몰린 곳이라 음식물이 많아, 주민용과 나눠 상가 전용 거점으로 둬요" },
+      { id: "h5", name: "남동쪽 나무 그늘 쉼터", lat: 37.54162, lng: 127.06964, households: 47,
+        why: "큰 길과 가까워 수거차가 골목 안까지 들어오지 않고도 비울 수 있어요" }
+    ]
+  }
+];
+
+function findRegion(text) {
+  const q = (text || "").replace(/\s/g, "");
+  if (!q) return null;
+  return REGIONS.find(r => r.keywords.some(k => q.includes(k) || k.includes(q))) || null;
+}
+
+// ---------- 파랑 한 계열 색 (api.js의 같은 이름 함수를 덮어씀) ----------
+// 적재율 0%  → 아주 연한 하늘색 (#d6e6fb)
+// 적재율 50% → 중간 파랑     (#4d8fe3)
+// 적재율 100% → 아주 진한 남색 (#0d2b6e)
+const BLUE_STEPS = [[214, 230, 251], [77, 143, 227], [13, 43, 110]];
+
+function fillColor(fill) {
+  const t = Math.max(0, Math.min(100, Number(fill) || 0)) / 100;
+  const [a, b, k] = t < 0.5 ? [BLUE_STEPS[0], BLUE_STEPS[1], t / 0.5] : [BLUE_STEPS[1], BLUE_STEPS[2], (t - 0.5) / 0.5];
+  const c = a.map((v, i) => Math.round(v + (b[i] - v) * k));
+  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+}
+
+function fillBadge(fill) {
+  if (fill >= 80) return '<span class="badge full">곧 가득</span>';
+  if (fill >= 60) return '<span class="badge warn">보통</span>';
+  return '<span class="badge ok">여유</span>';
+}

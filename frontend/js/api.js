@@ -5,7 +5,7 @@
 // 같은 함수가 진짜 API(FastAPI)를 호출합니다.
 // =============================================================
 
-const USE_MOCK = true;
+const USE_MOCK = false;  // 서버를 켜지 않고 화면만 볼 때는 true로 바꾸세요
 const API_BASE = "http://localhost:8000";
 
 // ---------- 시연 동네 기준점 ----------
@@ -85,62 +85,160 @@ function makeFakeReadings(binId) {
 }
 
 // ---------- 화면에서 쓰는 함수들 ----------
+// 서버에 연결되지 않으면 자동으로 예시 데이터로 바꿔서 화면이 깨지지 않게 합니다.
+let useMock = USE_MOCK;
+
+function showOfflineNotice() {
+  const put = () => {
+    if (document.getElementById("offlineNotice")) return;
+    const d = document.createElement("div");
+    d.id = "offlineNotice";
+    d.setAttribute("role", "status");
+    d.style.cssText = "position:fixed;left:16px;bottom:16px;z-index:3000;max-width:340px;background:#fde6e6;color:#8a2a2a;" +
+      "border-radius:12px;padding:12px 16px;font-size:14px;line-height:1.5;box-shadow:0 6px 18px rgba(0,0,0,.15)";
+    d.innerHTML = "<b>서버에 연결되지 않았어요</b><br>지금은 예시 데이터로 보여드려요. backend 폴더에서 서버를 켠 뒤 새로고침해 주세요.";
+    document.body.appendChild(d);
+  };
+  if (document.body) put(); else document.addEventListener("DOMContentLoaded", put);
+}
+
 async function request(path, options) {
   const res = await fetch(API_BASE + path, options);
-  if (!res.ok) throw new Error("API 오류: " + res.status);
+  if (!res.ok) {
+    let detail = "";
+    try { detail = (await res.json()).detail || ""; } catch (e) {}
+    const err = new Error(detail || "API 오류: " + res.status);
+    err.status = res.status;
+    throw err;
+  }
   return res.json();
 }
 
+// 서버 먼저 시도 → 연결 자체가 안 되면 예시 데이터
+async function fromServer(serverCall, mockCall) {
+  if (useMock) return mockCall();
+  try {
+    return await serverCall();
+  } catch (e) {
+    if (e.status) throw e;          // 서버는 켜져 있는데 오류를 돌려준 경우는 그대로 알림
+    useMock = true;                 // 연결 실패 → 이후 요청은 모두 예시 데이터
+    showOfflineNotice();
+    return mockCall();
+  }
+}
+
 async function getStations() {
-  if (USE_MOCK) return MOCK.stations;
-  return request("/stations");
+  return fromServer(() => request("/stations"), () => MOCK.stations);
 }
 
 async function getTodaySchedule() {
-  if (USE_MOCK) return MOCK.scheduleToday;
-  return request("/schedule/today");
+  return fromServer(() => request("/schedule/today"), () => MOCK.scheduleToday);
 }
 
 async function getReadings(binId) {
-  if (USE_MOCK) return makeFakeReadings(binId);
-  return request(`/bins/${binId}/readings`);
+  return fromServer(() => request(`/bins/${binId}/readings`), () => makeFakeReadings(binId));
 }
 
 async function getPrediction(binId) {
-  if (USE_MOCK) {
+  return fromServer(() => request(`/bins/${binId}/predict`), () => {
     const bin = MOCK.stations.flatMap(s => s.bins).find(b => b.id === binId);
     return { bin_id: binId, full_at: bin ? bin.full_at : null };
-  }
-  return request(`/bins/${binId}/predict`);
-}
-
-async function getCluster(id) {
-  if (USE_MOCK) return MOCK.cluster;
-  return request(`/clusters/${id}`);
-}
-
-async function joinCluster(id, data) {
-  if (USE_MOCK) {
-    MOCK.cluster.current += Number(data.households || 0);
-    MOCK.cluster.buildings.push({ name: data.building, households: Number(data.households) });
-    return MOCK.cluster;
-  }
-  return request(`/clusters/${id}/join`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data)
   });
 }
 
+async function getCluster(id) {
+  return fromServer(() => request(`/clusters/${id}`), () => MOCK.cluster);
+}
+
+async function joinCluster(id, data) {
+  return fromServer(
+    () => request(`/clusters/${id}/join`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    }),
+    () => {
+      MOCK.cluster.current += Number(data.households || 0);
+      MOCK.cluster.buildings.push({ name: data.building, households: Number(data.households) });
+      return MOCK.cluster;
+    });
+}
+
+// 사진 분류는 가짜 답을 보여주면 헷갈리므로, 서버 연결이 안 되면 이유를 알려 줍니다.
 async function classifyImage(file) {
-  if (USE_MOCK) {
-    await new Promise(r => setTimeout(r, 800)); // 분석하는 척 잠깐 기다림
-    return MOCK.classifyResult;
+  if (USE_MOCK) {  // 직접 예시 모드를 켠 경우에만 예시 답변
+    await new Promise(r => setTimeout(r, 800));
+    return { ...MOCK.classifyResult, item: MOCK.classifyResult.item + " (예시 답변)" };
   }
   const form = new FormData();
   form.append("image", file);
-  return request("/classify", { method: "POST", body: form });
+  try {
+    return await request("/classify", { method: "POST", body: form });
+  } catch (e) {
+    if (!e.status) {
+      showOfflineNotice();
+      throw new Error("서버에 연결되지 않았어요. 터미널에서 서버를 켠 뒤 다시 눌러 주세요.");
+    }
+    throw e;  // 예: API 키가 없을 때 서버가 보낸 안내 문구
+  }
 }
+
+// 장비 고장 감지 (서버: GET /bins/{id}/fault)
+async function getFault(binId) {
+  return fromServer(() => request(`/bins/${binId}/fault`), () => detectFault(binId));
+}
+
+// ---------- 무단투기: 사진 판단 → 신고 ----------
+// 사진 판단은 AI가 꼭 필요하므로 예시 답 대신 이유를 알려 줍니다.
+async function analyzeDumpingPhoto(file, stationId) {
+  if (USE_MOCK) {
+    await new Promise(r => setTimeout(r, 900));
+    return MOCK_DUMPING_RESULT;
+  }
+  const form = new FormData();
+  form.append("image", file);
+  if (stationId) form.append("station_id", stationId);
+  try {
+    return await request("/dumping/analyze", { method: "POST", body: form });
+  } catch (e) {
+    if (!e.status) {
+      showOfflineNotice();
+      throw new Error("서버에 연결되지 않았어요. 터미널에서 서버를 켠 뒤 다시 눌러 주세요.");
+    }
+    throw e;
+  }
+}
+
+async function sendDumpingReport(data) {
+  return fromServer(
+    () => request("/dumping/report", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data)
+    }),
+    () => ({ id: Date.now(), created_at: new Date().toISOString().slice(0, 16), status: "접수", ...data })
+  );
+}
+
+async function getDumpingReports() {
+  return fromServer(() => request("/dumping/reports"), () => []);
+}
+
+async function markReportDone(id) {
+  return fromServer(() => request(`/dumping/reports/${id}/done`, { method: "POST" }), () => ({ id, status: "처리 완료" }));
+}
+
+// 서버 없이 화면만 볼 때(USE_MOCK = true) 쓰는 예시 판단 결과
+const MOCK_DUMPING_RESULT = {
+  ok: true, verdict: "무단투기 의심", severity: "높음",
+  summary: "건물 벽 앞 보행로에 분리되지 않은 봉투와 펼친 상자가 쌓여 있어요 (예시 답변)",
+  violations: ["종량제 봉투가 아닌 일반 비닐봉투에 담아 버림", "재활용품이 한 봉투에 섞여 있음",
+               "상자를 접지 않고 쌓아 둠", "음식물이 묻은 포장재를 그대로 버림", "보행로를 막고 있음"],
+  items: [{ name: "페트병 묶음", category: "플라스틱", problem: "라벨을 떼지 않고 다른 쓰레기와 섞임" },
+          { name: "택배 상자", category: "종이", problem: "접지 않고 펼친 채 쌓임" }],
+  estimated_bags: 12, blocks_path: true,
+  report_text: "건물 앞 보행로에 종량제 봉투가 아닌 비닐봉투 10여 개와 상자가 분리되지 않은 채 쌓여 있습니다. 통행을 막고 있어 수거와 정리를 요청드립니다.",
+  action: "재활용품은 품목별로 나누고, 상자는 접어서 모음터 재활용칸으로 옮겨 주세요.",
+  privacy_note: ""
+};
 
 // ---------- 공통 도우미 ----------
 function fillColor(fill) {
