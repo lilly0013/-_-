@@ -1,0 +1,8 @@
+# API 키 (절대 올리지 않기)
+.env
+# 파이썬 임시 파일
+__pycache__/
+*.pyc
+# 맥 숨김 파일
+.DS_Store
+__MACOSX/
