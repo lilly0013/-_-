@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>골목버림 - 적재량</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+</head>
+<body data-tab="fill">
+  <main>
+    <section class="card" id="mapSection">
+      <h2>모음터 지도</h2>
+      <p class="sub">동그라미를 누르면 통별 적재량이 보여요</p>
+      <div id="map"></div>
+      <p class="muted" id="clickedCoord">빈 곳을 누르면 그 자리 좌표가 나와요</p>
+    </section>
+
+    <section class="card">
+      <h2>적재량 추이와 AI 예측</h2>
+      <div class="chips" id="binChips" role="group" aria-label="통 선택"></div>
+      <canvas id="chart" height="210" style="margin-top:12px"></canvas>
+      <div class="panel" style="background:var(--blue-soft)"><p id="predictText" style="color:var(--blue-deep);font-weight:600"></p></div>
+    </section>
+
+    <section class="card">
+      <h2>먼저 비울 곳</h2>
+      <p class="sub">적재율이 높은 통부터 보여 드려요</p>
+      <div id="ranking"></div>
+    </section>
+
+    <section class="card" id="faultSection">
+      <h2>장비 상태</h2>
+      <p class="sub">센서 값을 살펴 고장이 의심되면 바로 수리를 요청해요</p>
+      <div id="faults"></div>
+      <p class="muted">판단 기준: 한 시간 만에 무게가 15kg 넘게 튀거나, 4시간 동안 문이 10번 이상 열렸는데 무게가 그대로일 때</p>
+    </section>
+
+    <section class="card" id="dumpingSection">
+      <h2>무단투기 감지</h2>
+      <p class="sub">모음터 카메라가 방치된 쓰레기를 찾아요. 사람 얼굴은 가려서 처리해요</p>
+      <div id="dumping"></div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/features.js"></script>
+  <script src="js/layout.js"></script>
+  <script>
+    let chart;
+    let allBins = [];
+    const stationName = id => (window._stations.find(s => s.id === id) || {}).name || "";
+
+    function drawMap(stations) {
+      const map = L.map("map").setView([DEMO_AREA.lat, DEMO_AREA.lng], 18);
+      const satellite = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { attribution: "Tiles &copy; Esri", maxZoom: 19 });
+      const labels = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 });
+      const street = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", { attribution: "Tiles &copy; Esri", maxZoom: 19, maxNativeZoom: 15 });
+      L.layerGroup([satellite, labels]).addTo(map);
+      L.control.layers({ "위성 사진": L.layerGroup([satellite, labels]), "일반 지도": street }).addTo(map);
+
+      stations.forEach(s => {
+        const maxFill = Math.max(...s.bins.map(b => b.fill));
+        const rows = s.bins.map(b => `
+          <div style="margin:6px 0">${b.type} ${b.fill}%
+            <div class="bar"><div style="width:${b.fill}%;background:${fillColor(b.fill)}"></div></div>
+            <span class="muted">가득 예상 ${formatTime(b.full_at)}</span></div>`).join("");
+        L.circleMarker([s.lat, s.lng], { radius: 13, color: "#fff", weight: 3, fillColor: fillColor(maxFill), fillOpacity: 0.95 })
+          .addTo(map).bindPopup(`<strong>${s.name}</strong>${rows}`);
+      });
+
+      map.on("click", e => {
+        document.getElementById("clickedCoord").textContent =
+          `클릭한 좌표 lat: ${e.latlng.lat.toFixed(5)}, lng: ${e.latlng.lng.toFixed(5)}`;
+      });
+    }
+
+    async function drawChart(binId) {
+      document.querySelectorAll("#binChips .chip").forEach(c => {
+        const on = Number(c.dataset.id) === binId;
+        c.classList.toggle("on", on);
+        c.setAttribute("aria-pressed", on);
+      });
+      const readings = await getReadings(binId);
+      const prediction = await getPrediction(binId);
+      if (chart) chart.destroy();
+      chart = new Chart(document.getElementById("chart"), {
+        type: "line",
+        data: {
+          labels: readings.map(r => formatTime(r.time).split(" ")[1]),
+          datasets: [{ data: readings.map(r => r.fill), borderColor: "#3f7fe0", backgroundColor: "rgba(63,127,224,0.12)", fill: true, tension: 0.35, pointRadius: 0, borderWidth: 2.5 }]
+        },
+        options: {
+          scales: { y: { min: 0, max: 100, ticks: { callback: v => v + "%" } }, x: { ticks: { maxTicksLimit: 6 } } },
+          plugins: { legend: { display: false } }
+        }
+      });
+      document.getElementById("predictText").textContent =
+        `AI 예측: ${formatTime(prediction.full_at)}에 가득 찰 것 같아요`;
+    }
+
+    function drawFaults() {
+      const box = document.getElementById("faults");
+      box.innerHTML = allBins.map(b => {
+        const r = detectFault(b.id);
+        if (r.status !== "suspect") {
+          return `<div class="row"><span>${b.station} · ${b.type}</span><span class="badge ok">정상</span></div>`;
+        }
+        return `
+          <div class="panel alert" id="fault-${b.id}">
+            <h3>${b.station} · ${b.type}통 장비 이상 의심</h3>
+            <p>${r.reason}</p>
+            <div class="btn-row"><button class="small" data-repair="${b.id}">수거업체에 수리 요청</button></div>
+          </div>`;
+      }).join("");
+      box.querySelectorAll("[data-repair]").forEach(btn => btn.onclick = () => {
+        const id = btn.dataset.repair;
+        const panel = document.getElementById("fault-" + id);
+        panel.className = "panel caution";
+        btn.parentElement.innerHTML = '<span class="badge warn">수리 요청됨 · 수거업체 확인 대기</span>';
+        showToast("수리 요청 완료", "수거업체에 장비 점검을 요청했어요.");
+      });
+    }
+
+    function drawDumping() {
+      const box = document.getElementById("dumping");
+      box.innerHTML = DUMPING_EVENTS.map(ev => {
+        const done = ev.status === "done";
+        return `
+          <div class="panel ${done ? "" : "caution"}" id="dump-${ev.id}">
+            <h3>${stationName(ev.stationId)}</h3>
+            <p>${formatTime(ev.time)} · ${ev.what}</p>
+            <div class="btn-row">
+              ${done ? '<span class="badge ok">정리 완료</span>' : `
+                <button class="small" data-act="guard" data-id="${ev.id}">지킴이에게 정리 요청</button>
+                <button class="small ghost" data-act="report" data-id="${ev.id}">지자체에 신고</button>`}
+            </div>
+          </div>`;
+      }).join("");
+      box.querySelectorAll("[data-act]").forEach(btn => btn.onclick = () => {
+        const msg = btn.dataset.act === "guard" ? "이번 주 지킴이에게 정리 요청을 보냈어요" : "청소행정과에 신고 내용을 보냈어요";
+        btn.parentElement.innerHTML = `<span class="badge info">${msg}</span>`;
+        showToast("무단투기 처리", msg);
+      });
+    }
+
+    async function load() {
+      const features = getFeatures();
+      const stations = await getStations();
+      window._stations = stations;
+      allBins = stations.flatMap(s => s.bins.map(b => ({ ...b, station: s.name.split(" (")[0] })));
+
+      drawMap(stations);
+
+      document.getElementById("binChips").innerHTML = allBins.map(b =>
+        `<button class="chip" data-id="${b.id}" aria-pressed="false">${b.station} ${b.type}</button>`).join("");
+      document.querySelectorAll("#binChips .chip").forEach(c => c.onclick = () => drawChart(Number(c.dataset.id)));
+      drawChart(allBins[0].id);
+
+      document.getElementById("ranking").innerHTML = [...allBins].sort((a, b) => b.fill - a.fill).map(b => `
+        <div class="row" style="display:block">
+          <div style="display:flex;justify-content:space-between"><span>${b.station} · ${b.type}</span><span>${b.fill}% ${fillBadge(b.fill)}</span></div>
+          <div class="bar"><div style="width:${b.fill}%;background:${fillColor(b.fill)}"></div></div>
+        </div>`).join("");
+
+      document.getElementById("faultSection").hidden = !features.fault;
+      document.getElementById("dumpingSection").hidden = !features.dumping;
+      if (features.fault) drawFaults();
+      if (features.dumping) drawDumping();
+    }
+    load();
+  </script>
+</body>
+</html>
